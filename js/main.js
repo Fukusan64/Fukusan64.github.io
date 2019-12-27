@@ -129,14 +129,18 @@
     }
 
     class Shell {
-        constructor(terminal, version, prompt = '> ') {
+        constructor(
+            terminal,
+            version,
+            promptFunc = (out, isError) => out('> ', {color: (isError ? 'red' : 'white')})
+        ) {
             this.user;
             this.password;
             this.killed = false;
             this.version = version;
             this.terminal = terminal;
             this.buffer = new Buffer();
-            this.promptStr = prompt;
+            this.promptFunc = promptFunc;
             this.status = 0;
             this.commands = new Map();
             this.addCommand('help', (io) => {
@@ -241,7 +245,7 @@
             return {commandArray, err};
         }
         async prompt() {
-            this.terminal.out(this.promptStr, {color: this.status === 0 ? 'white' : 'red'});
+            this.promptFunc((...args) => this.terminal.out(...args), this.status !== 0, this.user);
             const command = await this.terminal.in({
                 oninput: ({srcElement}) => {
                     if (srcElement.value === '') {
@@ -334,7 +338,18 @@
 
     window.onload = async () => {
         const terminal = new Terminal('terminal');
-        const shell = new Shell(terminal, 'v0.1.0', '> ');
+        const shell = new Shell(
+            terminal,
+            'v0.1.1',
+            (out, isError, user) => {
+                out(`${user}@pc_hoge: `, {color: 'lime'});
+                out('[', {color: 'cyan'});
+                out('~');
+                out(']', {color: 'cyan'});
+                out(isError ? 'x' : ' ', {color: 'red'});
+                out('> ');
+            }
+        );
 
         for (const [key, val] of Object.entries(commands)) shell.addCommand(key, val);
 
