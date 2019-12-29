@@ -25,7 +25,7 @@
                             .map(e => e.offsetWidth)
                             .reduce((a, c) => a + c)
                             ;
-                        inputElem.style.width = `${lineWidth - spansWidth}px`;
+                        inputElem.style.width = `${lineWidth - spansWidth - 1}px`;
                     } else {
                         inputElem.style.width = '100%';
                     }
@@ -264,6 +264,7 @@
             await this.execCommands(commandArray);
         }
         async run() {
+            //多分シェルの仕事じゃないけど面倒なのでここでログイン処理をこなしてしまう
             this.terminal.clear();
             this.terminal.out('login\n');
             this.terminal.out('user: ');
