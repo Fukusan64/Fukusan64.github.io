@@ -341,7 +341,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.2.0',
+            'v0.2.1',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
