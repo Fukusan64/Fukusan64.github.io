@@ -66,7 +66,7 @@
                         e.srcElement.remove();
                         this._appendSpan(currentLine, `${text}`, {color, bgColor});
                         this.terminalElem.appendChild(this._createNewLine());
-                        res(text);
+                        res(`${text}\n`);
                     } else if (e.key === 'Tab') {
                         e.preventDefault();
                         e.stopPropagation();
@@ -225,6 +225,7 @@
             let keyword = '';
             const tokens = [];
             let err = false;
+            input = input.replace(/\n/g, '');
             for (let i = 0; i < input.length; i++) {
                 if (input[i] === '|' || input[i] === ';') {
                     tokens.push(keyword, input[i]);
@@ -327,10 +328,10 @@
             this.terminal.clear();
             this.terminal.out('login\n');
             this.terminal.out('user: ');
-            this.user = await this.terminal.in();
+            this.user = (await this.terminal.in()).replace(/\n/g, '');
             if (this.user.includes('\x04')) return;
             this.terminal.out('password: ');
-            this.password = await this.terminal.in({hidden: true});
+            this.password = (await this.terminal.in({hidden: true})).replace(/\n/g, '');
             if (this.password.includes('\x04')) return;
             this.killed = false;
             this.terminal.out(`Kuso Zako Terminal Modoki ${this.version}\n\n`, {color: 'gray'});
@@ -370,19 +371,19 @@
         let input = '';
         let finished = false;
         while (!finished) {
-            let inputTmp = '';
-            finished = (inputTmp = await io.in()).includes('\x04');
-            input = `${input}${inputTmp.replace(/\x04.*/, '')}`;
-        }
-        for (const line of input.split('\n')) {
-            const splittedLine = line.split(keyword);
+            if ((input = await io.in()).includes('\x04')) {
+                finished = true;
+                input = input.replace(/\x04.*/, '');
+                if (input[input.length - 1] !== '\n') input = `${input}\n`;
+            }
+            const splittedLine = input.split(keyword);
             if (splittedLine.length === 1) continue;
             for (let i = 0; i < splittedLine.length; i++) {
                 io.out(splittedLine[i]);
                 if (i !== splittedLine.length - 1) io.out(keyword, {color: 'red'});
             }
-            io.out('\n');
         }
+
         return 0;
     };
 
@@ -399,7 +400,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.3.3',
+            'v0.3.4',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
