@@ -128,10 +128,10 @@
         constructor() {
             this.data = [];
         }
-        out(input) {
+        in(input) {
             this.data.push(input);
         }
-        in() {
+        out() {
             return this.data.shift();
         }
         clear() {
@@ -150,7 +150,6 @@
             this.killed = false;
             this.version = version;
             this.terminal = terminal;
-            this.buffer = new Buffer();
             this.promptFunc = promptFunc;
             this.status = 0;
             this.defaultVal = '';
@@ -186,24 +185,26 @@
             return this.commands.has(name);
         }
         async execCommands(commandArray) {
+            let beforeBuffer = new Buffer();
             for (let i = 0; i < commandArray.length; i++){
                 const commandData = commandArray[i];
                 const io = {};
+                const buffer = new Buffer();
                 if (commandData.before === '|') {
-                    io.in = (...args) => this.buffer.in(...args);
+                    io.in = (...args) => beforeBuffer.out(...args);
                 } else {
                     io.in = (...args) => this.terminal.in(...args);
                 }
                 if (commandData.after === '|') {
-                    this.buffer.clear();
-                    io.out = (...args) => this.buffer.out(...args);
+                    io.out = (...args) => buffer.in(...args);
                 } else {
                     io.out = (...args) => this.terminal.out(...args);
                 }
                 await this.execCommand(commandData.commandName, io, commandData.args);
                 if (commandData.after === '|') {
-                    this.buffer.out('\x04');
+                    buffer.in('\x04');
                 }
+                beforeBuffer = buffer;
                 if (this.status !== 0 && commandData.after === '&&') break;
                 if (this.killed) break;
             }
@@ -369,19 +370,18 @@
         let input = '';
         let finished = false;
         while (!finished) {
-            if ((input = await io.in()).includes('\x04')) {
-                finished = true;
-                input = input.replace(/\x04.*/, '');
+            let inputTmp = '';
+            finished = (inputTmp = await io.in()).includes('\x04');
+            input = `${input}${inputTmp.replace(/\x04.*/, '')}`;
+        }
+        for (const line of input.split('\n')) {
+            const splittedLine = line.split(keyword);
+            if (splittedLine.length === 1) continue;
+            for (let i = 0; i < splittedLine.length; i++) {
+                io.out(splittedLine[i]);
+                if (i !== splittedLine.length - 1) io.out(keyword, {color: 'red'});
             }
-            for (const line of input.split('\n')) {
-                const splittedLine = line.split(keyword);
-                if (splittedLine.length === 1) continue;
-                for (let i = 0; i < splittedLine.length; i++) {
-                    io.out(splittedLine[i]);
-                    if (i !== splittedLine.length - 1) io.out(keyword, {color: 'red'});
-                }
-                io.out('\n');
-            }
+            io.out('\n');
         }
         return 0;
     };
@@ -399,7 +399,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.3.1',
+            'v0.3.3',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
