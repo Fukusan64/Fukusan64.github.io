@@ -373,17 +373,17 @@
         while (!finished) {
             if ((input = await io.in()).includes('\x04')) {
                 finished = true;
+                let isNoReturnedEnd = /\w+\x04/.test(input);
                 input = input.replace(/\x04.*/, '');
-                if (input[input.length - 1] !== '\n') input = `${input}\n`;
+                if (isNoReturnedEnd) input = `${input}\n`;
             }
             const splittedLine = input.split(keyword);
-            if (splittedLine.length === 1) continue;
+            if (splittedLine.length === 1 && splittedLine[0] !== '\n') continue;
             for (let i = 0; i < splittedLine.length; i++) {
                 io.out(splittedLine[i]);
                 if (i !== splittedLine.length - 1) io.out(keyword, {color: 'red'});
             }
         }
-
         return 0;
     };
 
@@ -400,7 +400,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.3.4',
+            'v0.3.5',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
