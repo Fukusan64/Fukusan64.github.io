@@ -365,24 +365,38 @@
         });
     };
 
+    async function* readline(inputFunc) {
+        let buffer = '';
+        let finished = false;
+        while (!finished) {
+            let input = (await inputFunc());
+            finished = input.includes('\x04');
+            const isNoReturnedEnd = /\w+\x04/.test(input);
+            input = input.replace(/\x04.*/, '');
+            if (isNoReturnedEnd) input = `${input}\n`;
+
+            const lines = input.split('\n');
+            lines[0] = `${buffer}${lines[0]}`;
+            buffer = lines.pop();
+            yield* lines;
+        }
+        return;
+    }
+
     var grep = async (io, args) => {
         const keyword = args[0];
         if (keyword === undefined) return 1;
-        let input = '';
-        let finished = false;
-        while (!finished) {
-            if ((input = await io.in()).includes('\x04')) {
-                finished = true;
-                let isNoReturnedEnd = /\w+\x04/.test(input);
-                input = input.replace(/\x04.*/, '');
-                if (isNoReturnedEnd) input = `${input}\n`;
-            }
-            const splittedLine = input.split(keyword);
-            if (splittedLine.length === 1 && splittedLine[0] !== '\n') continue;
+        const rl = readline(io.in);
+        while (true) {
+            const {done, value: line} = await rl.next();
+            if(done) break;
+            const splittedLine = line.split(keyword);
+            if (splittedLine.length === 1) continue;
             for (let i = 0; i < splittedLine.length; i++) {
                 io.out(splittedLine[i]);
                 if (i !== splittedLine.length - 1) io.out(keyword, {color: 'red'});
             }
+            io.out('\n');
         }
         return 0;
     };
@@ -400,7 +414,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.3.5',
+            'v0.3.6',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
