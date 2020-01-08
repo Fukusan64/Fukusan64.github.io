@@ -150,10 +150,10 @@
         previous() {
             if (this.pointer + 1 >= this.historyArray.length) {
                 this.pointer = this.historyArray.length - 1;
-                return this.historyArray[this.pointer];
+                return this.historyArray[this.pointer] || '';
             }
             this.pointer++;
-            return this.historyArray[this.pointer];
+            return this.historyArray[this.pointer] || '';
         }
         next() {
             if (this.pointer - 1 < 0) {
@@ -161,7 +161,7 @@
                 return '';
             }
             this.pointer--;
-            return this.historyArray[this.pointer];
+            return this.historyArray[this.pointer] || '';
         }
         add(command) {
             if (command === '\n') return;
@@ -478,7 +478,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.4.0',
+            'v0.4.1',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
