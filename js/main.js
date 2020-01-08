@@ -206,6 +206,10 @@
                 }
                 return 0;
             });
+            this.addCommand('history', (io) => {
+                this.history.historyArray.forEach(e => io.out(`${e}\n`));
+                return 0;
+            });
             this.addCommand('clear', () => {
                 this.terminal.clear();
                 return 0;
@@ -478,7 +482,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.4.1',
+            'v0.5.0',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
