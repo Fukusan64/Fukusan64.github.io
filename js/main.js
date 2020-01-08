@@ -12,7 +12,7 @@
                     ;
             });
         }
-        in({oninput, hidden, defaultVal,defaultColor} = {}) {
+        in({customOninput, customOnkeydown, hidden, defaultVal, defaultColor, tabReturn} = {}) {
             return new Promise(res => {
                 const lastLine = this.terminalElem.lastElementChild;
                 const inputElem = document.createElement('input');
@@ -38,10 +38,9 @@
                 }
                 inputElem.focus();
                 if (hidden) inputElem.style.color = 'rgba(0,0,0,0)';
-                else {
-                    if (typeof (oninput) === 'function') inputElem.addEventListener('input', oninput);
-                    if (typeof (defaultColor) === 'string') inputElem.style.color = defaultColor;
-                }
+                if (typeof (customOninput) === 'function') inputElem.addEventListener('input', customOninput);
+                if (typeof (customOnkeydown) === 'function') inputElem.addEventListener('keydown', customOnkeydown);
+                if (typeof (defaultColor) === 'string') inputElem.style.color = defaultColor;
                 if (defaultVal !== undefined) inputElem.value = defaultVal;
                 let onkeydown;
                 inputElem.addEventListener('keydown', onkeydown = (e) => {
@@ -53,7 +52,8 @@
                         e.preventDefault();
                         e.stopPropagation();
                         e.srcElement.removeEventListener('keydown', onkeydown);
-                        e.srcElement.removeEventListener('input', oninput);
+                        e.srcElement.removeEventListener('keydown', customOnkeydown);
+                        e.srcElement.removeEventListener('input', customOninput);
                         e.srcElement.remove();
                         this._appendSpan(currentLine, `${text}^D`, {color, bgColor});
                         this.terminalElem.appendChild(this._createNewLine());
@@ -62,16 +62,18 @@
                         e.preventDefault();
                         e.stopPropagation();
                         e.srcElement.removeEventListener('keydown', onkeydown);
-                        e.srcElement.removeEventListener('input', oninput);
+                        e.srcElement.removeEventListener('keydown', customOnkeydown);
+                        e.srcElement.removeEventListener('input', customOninput);
                         e.srcElement.remove();
                         this._appendSpan(currentLine, `${text}`, {color, bgColor});
                         this.terminalElem.appendChild(this._createNewLine());
                         res(`${text}\n`);
-                    } else if (e.key === 'Tab') {
+                    } else if (e.key === 'Tab' && tabReturn) {
                         e.preventDefault();
                         e.stopPropagation();
                         e.srcElement.removeEventListener('keydown', onkeydown);
-                        e.srcElement.removeEventListener('input', oninput);
+                        e.srcElement.removeEventListener('keydown', customOnkeydown);
+                        e.srcElement.removeEventListener('input', customOninput);
                         e.srcElement.remove();
                         this._appendSpan(currentLine, `${text}`, {color, bgColor});
                         this.terminalElem.appendChild(this._createNewLine());
@@ -139,6 +141,40 @@
         }
     }
 
+    class History{
+        constructor(size = 100, data = []) {
+            this.historyArray = data;
+            this.pointer = -1;
+            this.size = size;
+        }
+        previous() {
+            if (this.pointer + 1 >= this.historyArray.length) {
+                this.pointer = this.historyArray.length - 1;
+                return this.historyArray[this.pointer];
+            }
+            this.pointer++;
+            return this.historyArray[this.pointer];
+        }
+        next() {
+            if (this.pointer - 1 < 0) {
+                this.pointer = -1;
+                return '';
+            }
+            this.pointer--;
+            return this.historyArray[this.pointer];
+        }
+        add(command) {
+            if (command === '\n') return;
+            this.historyArray.unshift(command.replace('\n', ''));
+            this.pointer = -1;
+            if (this.historyArray.length > this.size) this.historyArray.pop();
+        }
+        clear() {
+            this.historyArray = [];
+            this.pointer = -1;
+        }
+    }
+
     class Shell {
         constructor(
             terminal,
@@ -151,6 +187,7 @@
             this.version = version;
             this.terminal = terminal;
             this.promptFunc = promptFunc;
+            this.history = new History();
             this.status = 0;
             this.defaultVal = '';
             this.commands = new Map();
@@ -263,7 +300,7 @@
             let defaultColor;
             if (this.defaultVal !== '') defaultColor = this.parseCommand(this.defaultVal).err ? 'red' : 'cyan';
             const command = await this.terminal.in({
-                oninput: ({srcElement}) => {
+                customOninput: ({srcElement}) => {
                     if (srcElement.value === '') {
                         srcElement.style.color = 'white';
                         return;
@@ -271,7 +308,32 @@
                     const {err} = this.parseCommand(srcElement.value);
                     srcElement.style.color = err ? 'red' : 'cyan';
                 },
+                customOnkeydown: (e) => {
+                    switch (e.key) {
+                        case 'ArrowUp': {
+                            e.srcElement.value = this.history.previous();
+                            if (e.srcElement.value === '') {
+                                e.srcElement.style.color = 'white';
+                                return;
+                            }
+                            const {err} = this.parseCommand(e.srcElement.value);
+                            e.srcElement.style.color = err ? 'red' : 'cyan';
+                            break;
+                        }
+                        case 'ArrowDown': {
+                            e.srcElement.value = this.history.next();
+                            if (e.srcElement.value === '') {
+                                e.srcElement.style.color = 'white';
+                                return;
+                            }
+                            const {err} = this.parseCommand(e.srcElement.value);
+                            e.srcElement.style.color = err ? 'red' : 'cyan';
+                            break;
+                        }
+                    }
+                },
                 defaultVal: this.defaultVal,
+                tabReturn: true,
                 defaultColor
             });
             if (command.includes('\x04')) {
@@ -284,6 +346,7 @@
                 return;
             }
             this.defaultVal = '';
+            this.history.add(command);
             await this.execCommands(commandArray);
         }
         suggest(commandArray) {
@@ -326,6 +389,7 @@
         async run() {
             //多分シェルの仕事じゃないけど面倒なのでここでログイン処理をこなしてしまう
             this.terminal.clear();
+            this.history.clear();
             this.terminal.out('login\n');
             this.terminal.out('user: ');
             this.user = (await this.terminal.in()).replace(/\n/g, '');
@@ -414,7 +478,7 @@
         const terminal = new Terminal('terminal');
         const shell = new Shell(
             terminal,
-            'v0.3.6',
+            'v0.4.0',
             (out, isError, user) => {
                 out(`${user}@pc_hoge: `, {color: 'lime'});
                 out('[', {color: 'cyan'});
